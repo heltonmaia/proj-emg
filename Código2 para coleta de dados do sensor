@@ -1,0 +1,14 @@
+#Código que fica na main da raspberry
+
+import serial
+
+ser = serial.Serial('COM6', 9600, timeout=1)
+
+try:
+    while True:
+        data = ser.readline().decode('utf-8').strip()  # Lê e decodifica os dados
+        if data:
+            print(data)
+except KeyboardInterrupt:
+    ser.close()
+    print("Conexão serial encerrada.")
