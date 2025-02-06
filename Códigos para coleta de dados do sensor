@@ -1,0 +1,79 @@
+# Código que roda no vs code
+
+import time
+import serial
+import cv2
+import threading
+
+# Configuração da comunicação serial
+ser = serial.Serial('COM6', 9600, timeout=1)
+
+# Configuração da captura de vídeo
+video_filename = "video_gravado.mp4"
+frame_width = 640
+frame_height = 480
+fps = 20
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec para MP4
+out = cv2.VideoWriter(video_filename, fourcc, fps, (frame_width, frame_height))
+cap = cv2.VideoCapture(0)  # Use a câmera padrão
+
+# Flag para controle da gravação
+is_recording = True
+
+def gravar_video():
+    global is_recording
+    while cap.isOpened() and is_recording:
+        ret, frame = cap.read()
+        if ret:
+            out.write(frame)  # Salva o frame no arquivo
+        else:
+            break
+
+def gravar_serial():
+    global is_recording
+    with open("dados_recebidos3.txt", "a") as arquivo:
+        while is_recording:
+            try:
+                # Leia os dados do sensor EMG
+                data = ser.readline().decode('utf-8').strip()
+                if data:
+                    print(data)
+                    arquivo.write(data + "\n")  # Salva os dados no arquivo
+            except serial.SerialException as e:
+                print(f"Erro na leitura da serial: {e}")
+                break
+try:
+    print("Iniciando gravação de dados e vídeo...")
+
+    # Inicia a gravação de vídeo e serial em threads separadas
+    video_thread = threading.Thread(target=gravar_video)
+    serial_thread = threading.Thread(target=gravar_serial)
+
+    start_time = time.time()  # Marca o tempo inicial
+    video_thread.start()
+    serial_thread.start()
+
+    # Monitora o tempo de execução (30 segundos)
+    while time.time() - start_time < 30:
+        time.sleep(1)
+
+    is_recording = False  # Sinaliza para parar a gravação
+
+    # Aguarda as threads finalizarem
+    video_thread.join()
+    serial_thread.join()
+
+except KeyboardInterrupt:
+    print("Encerrando gravação...")
+
+finally:
+    # Libera os recursos da serial
+    ser.close()  # Fecha a conexão serial
+    print("Conexão serial encerrada.")
+
+    # Libera os recursos do OpenCV
+    if cap.isOpened():
+        cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+    print("Gravação de vídeo finalizada.")
