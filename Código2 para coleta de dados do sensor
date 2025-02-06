@@ -1,14 +1,25 @@
-#Código que fica na main da raspberry
+#Código que está na main da raspberry
+from machine import ADC, Pin
+import time
 
-import serial
-
-ser = serial.Serial('COM6', 9600, timeout=1)
+# Configuração do ADC para o sensor EMG
+adc_pin = 26 
+adc = ADC(Pin(adc_pin))
 
 try:
+    start_time = time.ticks_ms()  # Tempo inicial em milissegundos
     while True:
-        data = ser.readline().decode('utf-8').strip()  # Lê e decodifica os dados
-        if data:
-            print(data)
+        # Lê o valor do sensor EMG
+        emg_value = adc.read_u16()  # Leitura de 16 bits do ADC
+        elapsed_time = time.ticks_diff(time.ticks_ms(), start_time) / 1000
+        elapsed_time_str = f"{elapsed_time:.3f}"
+        # Exibe os dados no console (opcional)
+        print(f"{elapsed_time_str}, {emg_value}")
+        time.sleep(0.01)
+
 except KeyboardInterrupt:
-    ser.close()
-    print("Conexão serial encerrada.")
+    print("\nColeta de dados interrompida pelo usuário.")
+
+finally:
+    print(f"Dados salvos em '{DATA_FILENAME}'.")
+
