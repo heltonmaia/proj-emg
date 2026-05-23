@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 import numpy as np
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
@@ -216,6 +216,46 @@ def write_metrics(results: List[ConfigResult], winner: ConfigResult,
     print(f"Saved {out}")
 
 
+def fit_final_model(ds: Dataset, max_depth) -> DecisionTreeClassifier:
+    """Train on all data (no CV) — used for export."""
+    clf = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
+    clf.fit(ds.X, ds.y)
+    return clf
+
+
+def plot_decision_tree(clf: DecisionTreeClassifier, feature_names: List[str]):
+    ensure_results_dir()
+    fig, ax = plt.subplots(figsize=(16, 8))
+    plot_tree(clf, ax=ax, feature_names=feature_names,
+              class_names=["aberta", "fechada"], filled=True, rounded=True,
+              fontsize=9)
+    plt.tight_layout()
+    for ext in ("png", "svg"):
+        out = os.path.join(RESULTS_DIR, f"decision_tree.{ext}")
+        plt.savefig(out, dpi=120, bbox_inches="tight")
+        print(f"Saved {out}")
+    plt.close(fig)
+
+
+def plot_feature_importance(clf: DecisionTreeClassifier, feature_names: List[str]):
+    ensure_results_dir()
+    imp = clf.feature_importances_
+    order = np.argsort(imp)[::-1]
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(range(len(imp)), imp[order], color="tab:blue")
+    ax.set_xticks(range(len(imp)))
+    ax.set_xticklabels([feature_names[i] for i in order], rotation=0)
+    ax.set_ylabel("Importance")
+    ax.set_title("Decision Tree — feature importance")
+    ax.grid(True, axis="y", alpha=0.3)
+    plt.tight_layout()
+    for ext in ("png", "svg"):
+        out = os.path.join(RESULTS_DIR, f"feature_importance.{ext}")
+        plt.savefig(out, dpi=150, bbox_inches="tight")
+        print(f"Saved {out}")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     csvs = list_csvs(os.path.join(PROJECT_ROOT, "rec_emg"))
     print(f"Loaded {len(csvs)} CSVs from rec_emg/")
@@ -230,3 +270,8 @@ if __name__ == "__main__":
     _, _, y_true, y_pred = logo_accuracy(ds_winner, max_depth=winner.max_depth)
     write_metrics(results, winner, ds_winner, y_true, y_pred)
     plot_confusion_matrix(y_true, y_pred)
+
+    clf_final = fit_final_model(ds_winner, winner.max_depth)
+    winning_features = FEATURE_SETS[winner.feature_set]
+    plot_decision_tree(clf_final, winning_features)
+    plot_feature_importance(clf_final, winning_features)
