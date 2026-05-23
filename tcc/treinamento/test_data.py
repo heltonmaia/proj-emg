@@ -2,6 +2,7 @@ import numpy as np
 import os
 import tempfile
 import pandas as pd
+import pytest
 
 from data import load_csv, FS, DURATION
 
@@ -38,5 +39,32 @@ def test_load_csv_label_schedule():
         assert labels[int(7.5 * FS)] == 1
         # Sample at t=27.5s (middle of last interval, mao fechada) -> 1
         assert labels[int(27.5 * FS)] == 1
+    finally:
+        os.unlink(path)
+
+
+def test_load_csv_raises_on_missing_column():
+    """Confirm the ValueError path for missing EMG_Value column."""
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+        path = f.name
+    try:
+        pd.DataFrame({"foo": [1, 2, 3]}).to_csv(path, index=False)
+        with pytest.raises(ValueError, match="EMG_Value"):
+            load_csv(path)
+    finally:
+        os.unlink(path)
+
+
+def test_load_csv_raises_on_wrong_length():
+    """Confirm the length guard for CSVs that aren't exactly 30s × 500Hz."""
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+        path = f.name
+    try:
+        # Half the expected length
+        n = FS * DURATION // 2
+        t = np.arange(n) / FS
+        pd.DataFrame({"Tempo(s)": t, "EMG_Value": np.zeros(n)}).to_csv(path, index=False)
+        with pytest.raises(ValueError, match="expected"):
+            load_csv(path)
     finally:
         os.unlink(path)

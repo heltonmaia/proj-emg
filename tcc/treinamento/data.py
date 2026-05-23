@@ -28,6 +28,10 @@ def load_csv(path: str) -> Tuple[np.ndarray, np.ndarray]:
         raise ValueError(f"{path}: missing EMG_Value column")
     sig = df["EMG_Value"].values.astype(float)
     n = len(sig)
+    if n != FS * DURATION:
+        raise ValueError(
+            f"{path}: expected {FS * DURATION} samples ({DURATION}s × {FS} Hz), got {n}"
+        )
     # Build per-sample timestamps from index (more robust than reading Tempo column)
     t = np.arange(n) / FS
     labels = np.empty(n, dtype=np.int8)
