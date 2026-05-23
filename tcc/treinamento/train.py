@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 import numpy as np
-from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.tree import DecisionTreeClassifier, _tree, plot_tree
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
@@ -144,6 +144,75 @@ def save_pkl(clf: DecisionTreeClassifier, feature_names: List[str]):
     payload = {"model": clf, "features": feature_names, "fs": 500}
     joblib.dump(payload, PKL_PATH)
     print(f"Saved {PKL_PATH}")
+
+
+# MicroPython-friendly bodies (no numpy on the Pico).
+MICROPYTHON_FEATURE_BODIES = {
+    "rms": (
+        "def calcula_rms(valores):\n"
+        "    return math.sqrt(sum(x*x for x in valores) / len(valores))\n"
+    ),
+    "mav": (
+        "def calcula_mav(valores):\n"
+        "    return sum(abs(x) for x in valores) / len(valores)\n"
+    ),
+    "sd": (
+        "def calcula_sd(valores):\n"
+        "    m = sum(valores) / len(valores)\n"
+        "    return math.sqrt(sum((x-m)*(x-m) for x in valores) / len(valores))\n"
+    ),
+    "wl": (
+        "def calcula_wl(valores):\n"
+        "    return sum(abs(valores[i] - valores[i-1]) for i in range(1, len(valores)))\n"
+    ),
+    "var": (
+        "def calcula_var(valores):\n"
+        "    m = sum(valores) / len(valores)\n"
+        "    return sum((x-m)*(x-m) for x in valores) / len(valores)\n"
+    ),
+    "zc": (
+        "def calcula_zc(valores, thresh=0):\n"
+        "    n = 0\n"
+        "    for i in range(1, len(valores)):\n"
+        "        if valores[i-1] * valores[i] < 0 and abs(valores[i]-valores[i-1]) > thresh:\n"
+        "            n += 1\n"
+        "    return n\n"
+    ),
+    "ssc": (
+        "def calcula_ssc(valores, thresh=0):\n"
+        "    n = 0\n"
+        "    for i in range(2, len(valores)):\n"
+        "        d1 = valores[i-1] - valores[i-2]\n"
+        "        d2 = valores[i]   - valores[i-1]\n"
+        "        if d1 * d2 < 0 and abs(d2-d1) > thresh:\n"
+        "            n += 1\n"
+        "    return n\n"
+    ),
+}
+
+
+def export_tree_as_ifelse(clf: DecisionTreeClassifier,
+                          feature_names: List[str], indent: int = 4) -> str:
+    """Convert sklearn DT into nested if/else MicroPython source."""
+    tree = clf.tree_
+
+    def recurse(node: int, depth: int) -> List[str]:
+        lines = []
+        ind = " " * (indent + depth * 4)
+        if tree.feature[node] != _tree.TREE_UNDEFINED:
+            name = feature_names[tree.feature[node]]
+            thr = tree.threshold[node]
+            lines.append(f"{ind}if {name} <= {thr:.6f}:")
+            lines.extend(recurse(tree.children_left[node], depth + 1))
+            lines.append(f"{ind}else:")
+            lines.extend(recurse(tree.children_right[node], depth + 1))
+        else:
+            counts = tree.value[node][0]
+            cls = int(np.argmax(counts))
+            lines.append(f"{ind}return {cls}")
+        return lines
+
+    return "\n".join(recurse(0, 0))
 
 
 def ensure_results_dir():
