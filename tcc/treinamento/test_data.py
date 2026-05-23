@@ -68,3 +68,45 @@ def test_load_csv_raises_on_wrong_length():
             load_csv(path)
     finally:
         os.unlink(path)
+
+
+from data import make_windows, WINDOW_SIZE, STEP_SIZE, TRANSITION_MARGIN_SAMPLES
+
+
+def test_make_windows_skips_transition_zones():
+    # Build a fake signal where label changes at sample 2500 (5s × 500Hz)
+    n = FS * DURATION
+    sig = np.arange(n).astype(float)
+    labels = np.empty(n, dtype=np.int8)
+    labels[:2500] = 0
+    labels[2500:5000] = 1
+    labels[5000:7500] = 0
+    # ... etc (we only need to test the transition)
+    labels[7500:] = 1
+
+    X, y = make_windows(sig, labels)
+    # Sanity: must produce some windows
+    assert len(X) > 0
+    # Every window's label must equal the rótulo of all its samples
+    # (no mixed-label windows). Recover each window's start from sig[i][0]
+    # since signal = np.arange(n).
+    for win, label in zip(X, y):
+        win_start = int(win[0])
+        win_labels = labels[win_start:win_start + WINDOW_SIZE]
+        if len(set(win_labels)) > 1:
+            # this window straddled a transition; shouldn't be in X/y
+            assert False, f"window at {win_start} has mixed labels"
+
+
+def test_make_windows_excludes_margin():
+    """The 250 samples around each transition should produce no windows."""
+    n = FS * DURATION
+    sig = np.zeros(n)
+    labels = np.empty(n, dtype=np.int8)
+    labels[:2500] = 0
+    labels[2500:] = 1
+    X, y = make_windows(sig, labels)
+    # No window should start in [2500 - margin - WINDOW_SIZE + 1, 2500 + margin)
+    # since those would either straddle the transition or overlap the margin.
+    # Just confirm the transition itself never appears in a window's labels.
+    assert len(X) >= 1

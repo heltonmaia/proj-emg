@@ -50,3 +50,45 @@ def list_csvs(dir_path: str = "rec_emg") -> List[str]:
     if not paths:
         raise SystemExit(f"No CSVs found at {pattern}. Aborting.")
     return paths
+
+
+WINDOW_SIZE = 100              # 200 ms at 500 Hz, matches prediction.py
+STEP_SIZE = 50                 # 50% overlap
+TRANSITION_MARGIN_SAMPLES = 250   # 500 ms each side of a label change
+
+
+def make_windows(signal: np.ndarray,
+                 labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Slide a window of WINDOW_SIZE samples with STEP_SIZE step.
+
+    Skips any window whose start lies within TRANSITION_MARGIN_SAMPLES
+    of a label change, and any window that internally spans more than
+    one label (defensive — shouldn't occur given the margin).
+    """
+    n = len(signal)
+    assert n == len(labels)
+    # Indexes where label changes (transitions)
+    transitions = np.where(np.diff(labels) != 0)[0] + 1   # index of new-label start
+    transition_zones = []
+    for t in transitions:
+        transition_zones.append((t - TRANSITION_MARGIN_SAMPLES,
+                                 t + TRANSITION_MARGIN_SAMPLES))
+
+    def in_transition_zone(start: int) -> bool:
+        end = start + WINDOW_SIZE
+        for lo, hi in transition_zones:
+            if start < hi and end > lo:
+                return True
+        return False
+
+    Xs, ys = [], []
+    for start in range(0, n - WINDOW_SIZE + 1, STEP_SIZE):
+        if in_transition_zone(start):
+            continue
+        win = signal[start:start + WINDOW_SIZE]
+        win_labels = labels[start:start + WINDOW_SIZE]
+        if win_labels.min() != win_labels.max():
+            continue          # mixed-label window (defensive)
+        Xs.append(win)
+        ys.append(int(win_labels[0]))
+    return np.asarray(Xs), np.asarray(ys, dtype=np.int8)
