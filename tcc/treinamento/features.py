@@ -30,3 +30,26 @@ def wl(x: np.ndarray) -> float:
 def var(x: np.ndarray) -> float:
     """Variance, population (ddof=0). Equal to sd(x)**2."""
     return float(np.var(x.astype(float), ddof=0))
+
+
+def zc(x: np.ndarray, threshold: float = 0.0) -> int:
+    """Zero Crossings — number of sign changes in x where
+    |x[i+1] - x[i]| exceeds threshold (deadzone to suppress noise)."""
+    x = x.astype(float)
+    sign_changed = x[:-1] * x[1:] < 0
+    large_enough = np.abs(x[1:] - x[:-1]) > threshold
+    return int(np.sum(sign_changed & large_enough))
+
+
+def ssc(x: np.ndarray, threshold: float = 0.0) -> int:
+    """Slope Sign Changes — number of times the discrete derivative
+    changes sign, with a deadzone on the change magnitude."""
+    d = np.diff(x.astype(float))
+    sign_changed = d[:-1] * d[1:] < 0
+    large_enough = np.abs(d[1:] - d[:-1]) > threshold
+    return int(np.sum(sign_changed & large_enough))
+
+
+def wamp(x: np.ndarray, threshold: float) -> int:
+    """Willison Amplitude — number of consecutive |diff| > threshold."""
+    return int(np.sum(np.abs(np.diff(x.astype(float))) > threshold))

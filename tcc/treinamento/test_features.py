@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from features import rms, mav, sd, wl, var
+from features import rms, mav, sd, wl, var, zc, ssc, wamp
 
 
 def test_rms_constant_signal():
@@ -51,3 +51,32 @@ def test_wl_constant_signal_is_zero():
 def test_var_is_sd_squared():
     x = np.array([1, 2, 3, 4, 5])
     assert var(x) == pytest.approx(sd(x) ** 2)
+
+
+def test_zc_no_crossings_when_all_positive():
+    assert zc(np.array([1, 2, 3, 4, 5])) == 0
+
+
+def test_zc_counts_sign_changes():
+    # [1, -1, 1, -1, 1] has 4 sign changes
+    assert zc(np.array([1, -1, 1, -1, 1])) == 4
+
+
+def test_zc_threshold_suppresses_small_changes():
+    # diff = 0.1; with threshold 0.5, no crossings count
+    assert zc(np.array([0.1, -0.1, 0.1]), threshold=0.5) == 0
+
+
+def test_ssc_counts_slope_reversals():
+    # [1, 2, 1, 2] -> diff = [1, -1, 1] -> 2 sign changes in diff
+    assert ssc(np.array([1, 2, 1, 2])) == 2
+
+
+def test_ssc_monotonic_signal_no_reversals():
+    assert ssc(np.array([1, 2, 3, 4, 5])) == 0
+
+
+def test_wamp_counts_amplitude_jumps():
+    # [0, 1, 0, 5, 0] -> diffs = [1, -1, 5, -5] -> abs = [1,1,5,5]
+    # with threshold 2: 2 jumps (the 5s)
+    assert wamp(np.array([0, 1, 0, 5, 0]), threshold=2.0) == 2
