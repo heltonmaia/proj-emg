@@ -32,9 +32,9 @@ python spectral_analysis.py
 
 ## A pergunta que motivou esta pasta
 
-> *"O classificador EMG da minha aluna está aprendendo padrões de
-> contração muscular real, ou só amplitude de ruído (rede elétrica,
-> artefato de movimento)?"*
+> *"O classificador EMG atual está aprendendo padrões de contração
+> muscular real, ou só amplitude de ruído (rede elétrica, artefato de
+> movimento)?"*
 
 As features que a árvore de decisão usa (RMS, desvio padrão, média,
 waveform length) são todas sensíveis a amplitude. Não distinguem
@@ -87,8 +87,8 @@ broadband EMG), não apenas linhas estreitas em 60 Hz.
 
 ## O que isso significa pro projeto
 
-- O TCC da aluna está cientificamente fundamentado: o classificador de
-  fato discrimina contração muscular.
+- O TCC está cientificamente fundamentado: o classificador de fato
+  discrimina contração muscular.
 - A árvore de decisão atual, mesmo simples, opera sobre features
   legítimas de amplitude EMG.
 - **Margens claras pra melhorar**:
