@@ -13,12 +13,13 @@ prediction.py at the project root with the trained tree.
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import LeaveOneGroupOut
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 # allow running as `python train.py` from tcc/treinamento/
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -128,6 +129,56 @@ def select_winner(results: List[ConfigResult]) -> ConfigResult:
     return sorted(results, key=sort_key)[0]
 
 
+RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
+
+
+def ensure_results_dir():
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def write_metrics(results: List[ConfigResult], winner: ConfigResult,
+                  ds_winner: Dataset, y_true: np.ndarray, y_pred: np.ndarray):
+    """Write metrics.txt with top 5 + winner + classification report."""
+    ensure_results_dir()
+    out = os.path.join(RESULTS_DIR, "metrics.txt")
+
+    def sort_key(r):
+        depth = 999 if r.max_depth is None else r.max_depth
+        return (-r.mean_acc, r.std_acc, r.n_features, depth)
+    sorted_results = sorted(results, key=sort_key)
+    top5 = sorted_results[:5]
+
+    with open(out, "w") as f:
+        f.write(f"# Sweep results — Classificador EMG 500 Hz\n")
+        f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"# Total configs tested: {len(results)}\n")
+        f.write(f"# Dataset: {ds_winner.X.shape[0]} windows × {ds_winner.X.shape[1]} features\n")
+        f.write(f"\n")
+        f.write(f"## Top 5 configs (by mean LOGO accuracy)\n\n")
+        f.write(f"{'#':<4}{'feature_set':<14}{'depth':<8}{'n_feat':<8}{'mean_acc':<12}{'std_acc':<10}\n")
+        for i, r in enumerate(top5, start=1):
+            f.write(f"{i:<4}{r.feature_set:<14}{r.depth_str:<8}{r.n_features:<8}"
+                    f"{r.mean_acc:.4f}      {r.std_acc:.4f}\n")
+        f.write(f"\n")
+        f.write(f"## Winner\n\n")
+        f.write(f"feature_set: {winner.feature_set}\n")
+        f.write(f"max_depth:   {winner.depth_str}\n")
+        f.write(f"n_features:  {winner.n_features}\n")
+        f.write(f"mean_acc:    {winner.mean_acc:.4f}\n")
+        f.write(f"std_acc:     {winner.std_acc:.4f}\n")
+        f.write(f"\n")
+        f.write(f"## Classification report (LOGO aggregated)\n\n")
+        f.write(classification_report(y_true, y_pred,
+                                       target_names=["aberta (0)", "fechada (1)"],
+                                       digits=4))
+        cm = confusion_matrix(y_true, y_pred)
+        f.write(f"\n## Confusion matrix (absolute counts)\n\n")
+        f.write(f"             Predicted aberta  Predicted fechada\n")
+        f.write(f"True aberta       {cm[0,0]:>5}             {cm[0,1]:>5}\n")
+        f.write(f"True fechada      {cm[1,0]:>5}             {cm[1,1]:>5}\n")
+    print(f"Saved {out}")
+
+
 if __name__ == "__main__":
     csvs = list_csvs(os.path.join(PROJECT_ROOT, "rec_emg"))
     print(f"Loaded {len(csvs)} CSVs from rec_emg/")
@@ -136,3 +187,8 @@ if __name__ == "__main__":
     print()
     print(f"Winner: feature_set={winner.feature_set}, max_depth={winner.depth_str}")
     print(f"  Mean LOGO accuracy: {winner.mean_acc:.3f} ± {winner.std_acc:.3f}")
+
+    # Re-run LOGO on the winner config to aggregate y_true/y_pred for metrics
+    ds_winner = build_dataset(csvs, FEATURE_SETS[winner.feature_set])
+    _, _, y_true, y_pred = logo_accuracy(ds_winner, max_depth=winner.max_depth)
+    write_metrics(results, winner, ds_winner, y_true, y_pred)
