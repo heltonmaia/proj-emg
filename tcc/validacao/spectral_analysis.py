@@ -132,7 +132,7 @@ def make_drawers(ds: Dataset, sig, t, fft_freqs, fft_rest, fft_flex,
 
     def draw_spectrogram(ax, fig, cax=None):
         pcm = ax.pcolormesh(spec_t, spec_f, 10 * np.log10(Sxx + 1e-12),
-                            shading="gouraud", cmap="viridis", rasterized=True)
+                            shading="auto", cmap="viridis", rasterized=True)
         for t0 in [5, 10, 15, 20, 25]:
             ax.axvline(t0, color="white", ls="--", alpha=0.6, lw=0.8)
         ax.set_xlim(0, DURATION)
