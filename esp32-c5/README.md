@@ -17,28 +17,80 @@ root `README.md`.
 
 ## Hardware wiring
 
-Connect the EMG sensor breakout to the C5 dev kit as follows:
+The sensor in use is the Brazilian-market **"Módulo Sensor Elétrico
+Muscular EMG Raw"** — a raw-output instrumentation amplifier (likely
+AD620 / INA126) on a red PCB, with a 5-pin header
+(`+Vs`, `GND`, `-Vs`, `SIG`, `GND`) and a 3.5 mm TRS jack for the
+electrodes. It needs a **split ±9 V supply**, typically from two
+9 V batteries in series.
 
-| Sensor pin | C5 pin | Notes                                            |
-|-----------:|:-------|:-------------------------------------------------|
-| **SIG / OUT** | **GPIO1** | Analog output of the sensor → ADC1_CH0.       |
-| **GND**       | **GND**   | Any GND pin on the dev kit. Common ground is mandatory for single-ended ADC. |
-| **VCC**       | **3V3**   | Use the 3.3 V rail, not 5 V — the C5 ADC tops out at ~3.3 V with ATTN_11DB. |
+### The single most important concept: common ground
 
-The exact silkscreen label for **GPIO1** depends on your dev kit. On the
-Espressif `ESP32-C5-DevKitC-1`, it's typically printed as `IO1` or `1` on
-the header. If the board has both `GPIO1` and `IO1` labels, they're the
-same pin.
+The ADC measures voltage **between SIG and the C5's own GND**. If SIG is
+electrically floating relative to that GND, the reading is undefined and
+can even damage the input. Everything in the circuit needs to share the
+same 0 V reference.
 
-Avoid `GPIO2` and `GPIO3` for the analog input even though they are also
-on the ADC — they're **strap pins** (boot mode selection), so applying a
-sensor's static bias to them at power-on can put the chip in a wrong
-boot state. `GPIO1`, `GPIO4`, `GPIO5`, and `GPIO6` are all safe analog
-inputs.
+For a split supply, **the 0 V reference is not the negative terminal of
+a battery** — it's the **center tap**, the point where the two batteries
+meet:
 
-If you ever need to move the input to a different pin, change `ADC_PIN`
-in `esp32-board.py` to the new GPIO number — the MicroPython API takes
-the GPIO directly.
+```
+                   ┌── +9 V  → module +Vs
+   Battery 1 ──────┤
+                   │
+                   ├── 0 V (CENTER TAP) ◄── system ground reference
+                   │
+   Battery 2 ──────┤
+                   └── -9 V  → module -Vs
+```
+
+`+9 V` sits **9 V above** this reference; `-9 V` sits **9 V below** it.
+The module's `GND` pins (there are two of them on the header, internally
+the same node) are tied to this center tap. **The C5's GND must be tied
+to the same center tap**, so that the C5 ADC and the sensor SIG share
+the same 0 V.
+
+### Connection table
+
+| From | To | Why |
+|---|---|---|
+| Battery 1 (+) | Module `+Vs` | positive rail |
+| Battery 1 (–) ⟵ joined ⟶ Battery 2 (+) | Module `GND` (between +Vs/-Vs) | **center tap = 0 V reference** |
+| Battery 2 (–) | Module `-Vs` | negative rail |
+| Module **`SIG`** | **C5 GPIO1** | analog EMG signal → ADC1_CH0 |
+| Module **`GND`** (next to SIG) | **C5 GND** | common ground tie (mandatory) |
+
+The two GND pins on the module are the same electrical node — use
+whichever is convenient. In the existing Pico setup, the "battery-side"
+GND goes to the center tap and the "signal-side" GND goes to the MCU.
+Replicate that for the C5.
+
+### Symptoms of a missing ground tie
+
+If the module-GND-to-C5-GND wire is missing or loose, you'll see one of:
+constant ADC value, full-scale saturation (0 or 65 535), no response to
+muscle contraction, lots of 60 Hz coupled noise — or, in the worst case,
+permanent damage to the GPIO pin from current through its ESD diodes.
+
+### ADC pin choice
+
+The ESP32-C5 has a **single 12-bit SAR ADC** with up to 6 channels on
+GPIO1–GPIO6 (datasheet Table 2-7). Unlike older ESP32 chips, there is
+**no second ADC unit shared with the Wi-Fi radio**, so the classic
+"ADC1 only" caveat does not apply here.
+
+| GPIO  | ADC channel | Notes                                  |
+|-------|-------------|----------------------------------------|
+| GPIO1 | ADC1_CH0    | What we use. Not a strap pin.          |
+| GPIO2 | ADC1_CH1    | Strap pin — avoid for analog input.    |
+| GPIO3 | ADC1_CH2    | Strap pin — avoid for analog input.    |
+| GPIO4 | ADC1_CH3    | OK                                     |
+| GPIO5 | ADC1_CH4    | OK                                     |
+| GPIO6 | ADC1_CH5    | OK                                     |
+
+If you change the pin in `esp32-board.py`, keep it on one of GPIO4–GPIO6
+(or GPIO1) to avoid strapping conflicts.
 
 ## The two scripts run on different machines
 
@@ -130,25 +182,6 @@ pattern we've found that's robust on this chip + MicroPython version.
 
 `esp32-board.py` also explicitly disables Wi-Fi and BLE before sampling
 (both share the radio block, which couples into the analog frontend).
-
-## ADC pin choice
-
-The ESP32-C5 has a **single 12-bit SAR ADC** with up to 6 channels on
-GPIO1–GPIO6 (datasheet Table 2-7). Unlike older ESP32 chips, there is
-**no second ADC unit shared with the Wi-Fi radio**, so the classic
-"ADC1 only" caveat does not apply here.
-
-| GPIO  | ADC channel | Notes                                  |
-|-------|-------------|----------------------------------------|
-| GPIO1 | ADC1_CH0    | What we use. Not a strap pin.          |
-| GPIO2 | ADC1_CH1    | Strap pin — avoid for analog input.    |
-| GPIO3 | ADC1_CH2    | Strap pin — avoid for analog input.    |
-| GPIO4 | ADC1_CH3    | OK                                     |
-| GPIO5 | ADC1_CH4    | OK                                     |
-| GPIO6 | ADC1_CH5    | OK                                     |
-
-If you change the pin in `esp32-board.py`, keep it on one of GPIO4–GPIO6
-(or GPIO1) to avoid strapping conflicts.
 
 ## Headroom at 2 kHz
 
