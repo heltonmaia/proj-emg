@@ -10,8 +10,17 @@ elétrica, drift de movimento, etc.).
 | Arquivo | O que é |
 |---|---|
 | `reference_signal.csv` | Gravação de referência (cópia de `rec_emg/new_emg_data8.csv`) — 30 s a 500 Hz com prompts em 0/5/10/15/20/25 s. |
-| `spectral_analysis.py` | Script de análise: corta janelas de repouso e contração, calcula FFT médio, PSD de Welch e espectrograma, gera figura comparativa. |
-| `spectral_analysis.png` | Figura de 4 painéis: tempo + FFT + Welch + espectrograma. |
+| `spectral_analysis.py` | Script de análise: corta janelas de repouso e contração, calcula FFT médio, PSD de Welch e espectrograma, gera figuras comparativas. |
+| `spectral_analysis.{png,svg}` | Figura combinada de 4 painéis (tempo → espectrograma → FFT → Welch PSD). PNG pra preview, SVG vetorial pra inclusão em LaTeX / edição. |
+| `panel_timeseries.svg` | Painel individual: sinal no tempo. |
+| `panel_spectrogram.svg` | Painel individual: espectrograma. |
+| `panel_fft.svg` | Painel individual: FFT linear médio repouso vs contração. |
+| `panel_welch_psd.svg` | Painel individual: PSD (Welch, escala log) repouso vs contração. |
+
+Os SVGs do espectrograma usam `rasterized=True` no `pcolormesh` — eixos
+e texto continuam vetoriais, só o heatmap em si fica embutido como
+raster (PNG dentro do SVG). Isso mantém os arquivos em ~1 MB em vez dos
+~95 MB que sairiam com a heatmap totalmente vetorizada.
 
 ## Como rodar
 

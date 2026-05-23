@@ -4,14 +4,30 @@
 Input  : reference_signal.csv (a 30 s Pico recording at 500 Hz with prompts at
          0/5/10/15/20/25 s for open/close/open/close/open/close).
 
-Outputs:
-  1. spectral_analysis.png  — 4-panel figure:
-       (a) Time-domain signal with labelled windows
-       (b) Linear FFT: average rest spectrum vs average contraction spectrum
-       (c) Welch PSD (smoother estimate) for rest vs contraction
-       (d) Spectrogram of the whole recording
+Outputs (all written next to this script):
 
-  2. Console summary of band-wise energy ratios contraction/rest.
+  Combined 4-panel figure (time → spectrogram → FFT → Welch PSD):
+    - spectral_analysis.png   (raster, for README preview)
+    - spectral_analysis.svg   (vector envelope, spectrogram rasterized inside)
+
+  Individual panels (each as its own vector file):
+    - panel_timeseries.svg
+    - panel_spectrogram.svg
+    - panel_fft.svg
+    - panel_welch_psd.svg
+
+  Console summary of band-wise energy ratios contraction/rest.
+
+Notes on the layout:
+  - Time-series and spectrogram share the same time axis (0–30 s) and are
+    stacked vertically so the same vertical column corresponds to the same
+    instant in both plots.
+  - The spectrogram's colorbar lives in a separate GridSpec column so its
+    width doesn't shrink the spectrogram axis — all four main panels keep
+    the same plot width.
+  - `rasterized=True` on the spectrogram pcolormesh keeps the SVG small
+    (text + axes remain vector; only the heatmap pixels are embedded as
+    raster).
 
 Run:
     cd tcc/validacao
@@ -30,16 +46,15 @@ from scipy.signal import welch, spectrogram
 # ---------- Config ----------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "reference_signal.csv")
-OUT_PNG = os.path.join(SCRIPT_DIR, "spectral_analysis.png")
 
 FS = 500            # Hz, the Pico recording sample rate
+DURATION = 30       # s
 
-# Window scheme of the recording prompts:
-REST_WINDOWS = [(0, 5), (10, 15), (20, 25)]      # arm still / hand open
-FLEX_WINDOWS = [(5, 10), (15, 20), (25, 30)]     # hand closed (contraction)
-
-EMG_BAND = (20, 150)            # dominant sEMG band (highlighted on plots)
+REST_WINDOWS = [(0, 5), (10, 15), (20, 25)]
+FLEX_WINDOWS = [(5, 10), (15, 20), (25, 30)]
+EMG_BAND = (20, 150)
 MAINS_HARMONICS = [60, 120, 180]
+SAVE_DPI = 150
 
 
 # ---------- Load ----------
@@ -56,11 +71,10 @@ def slice_sig(t0, t1):
 
 
 def avg_fft(windows):
-    """Average linear-FFT magnitude across the given (t0, t1) windows."""
     spectra = []
     freqs_ref = None
     for t0, t1 in windows:
-        x = slice_sig(t0, t1) - slice_sig(t0, t1).mean()  # remove DC
+        x = slice_sig(t0, t1) - slice_sig(t0, t1).mean()
         n = len(x)
         spectra.append(np.abs(np.fft.rfft(x)) * 2 / n)
         if freqs_ref is None:
@@ -69,7 +83,6 @@ def avg_fft(windows):
 
 
 def avg_welch(windows, nperseg=512):
-    """Average Welch PSD across the given windows."""
     psds = []
     freqs_ref = None
     for t0, t1 in windows:
@@ -91,66 +104,115 @@ fft_freqs, fft_rest = avg_fft(REST_WINDOWS)
 _,         fft_flex = avg_fft(FLEX_WINDOWS)
 welch_freqs, welch_rest = avg_welch(REST_WINDOWS)
 _,           welch_flex = avg_welch(FLEX_WINDOWS)
+spec_f, spec_t, Sxx = spectrogram(sig - sig.mean(), fs=FS, nperseg=256, noverlap=128)
 
 
-# ---------- Figure ----------
-fig, axes = plt.subplots(4, 1, figsize=(12, 14))
+# ---------- Per-panel drawing functions ----------
+def draw_timeseries(ax):
+    ax.plot(t, sig, lw=0.4, color="black")
+    for t0, t1 in REST_WINDOWS:
+        ax.axvspan(t0, t1, color="tab:blue", alpha=0.10)
+    for t0, t1 in FLEX_WINDOWS:
+        ax.axvspan(t0, t1, color="tab:red", alpha=0.12)
+    ax.set_xlim(0, DURATION)
+    ax.set_xlabel("Tempo (s)")
+    ax.set_ylabel("EMG_Value (ADC)")
+    ax.set_title("Sinal completo — azul = repouso, vermelho = contração")
+    ax.grid(True, alpha=0.3)
 
-# (a) Time domain
-ax = axes[0]
-ax.plot(t, sig, lw=0.4, color="black")
-for t0, t1 in REST_WINDOWS:
-    ax.axvspan(t0, t1, color="tab:blue", alpha=0.10)
-for t0, t1 in FLEX_WINDOWS:
-    ax.axvspan(t0, t1, color="tab:red", alpha=0.12)
-ax.set_xlabel("Tempo (s)")
-ax.set_ylabel("EMG_Value (ADC)")
-ax.set_title("(a) Sinal completo — azul = repouso, vermelho = contração")
-ax.grid(True, alpha=0.3)
 
-# (b) Linear FFT
-ax = axes[1]
-ax.plot(fft_freqs, fft_rest, label="Repouso (mão aberta, parada)", color="tab:blue", lw=1.5)
-ax.plot(fft_freqs, fft_flex, label="Contração (mão fechada)", color="tab:red", lw=1.5)
-ax.axvspan(*EMG_BAND, color="green", alpha=0.07, label=f"Banda dominante sEMG ({EMG_BAND[0]}–{EMG_BAND[1]} Hz)")
-for hz in MAINS_HARMONICS:
-    ax.axvline(hz, color="grey", ls=":", alpha=0.6)
-    ax.text(hz, ax.get_ylim()[1] * 0.95, f" {hz} Hz", color="grey", fontsize=8, va="top")
-ax.set_xlim(0, FS / 2)
-ax.set_xlabel("Frequência (Hz)")
-ax.set_ylabel("Magnitude FFT (linear)")
-ax.set_title("(b) Espectro médio: repouso vs contração (FFT linear)")
-ax.legend(loc="upper right", fontsize=9)
-ax.grid(True, alpha=0.3)
+def draw_spectrogram(ax, fig, cax=None):
+    pcm = ax.pcolormesh(spec_t, spec_f, 10 * np.log10(Sxx + 1e-12),
+                        shading="gouraud", cmap="viridis", rasterized=True)
+    for t0 in [5, 10, 15, 20, 25]:
+        ax.axvline(t0, color="white", ls="--", alpha=0.6, lw=0.8)
+    ax.set_xlim(0, DURATION)
+    ax.set_xlabel("Tempo (s)")
+    ax.set_ylabel("Frequência (Hz)")
+    ax.set_title("Espectrograma — bandas verticais escuras = contrações")
+    if cax is not None:
+        fig.colorbar(pcm, cax=cax, label="Potência (dB)")
+    else:
+        fig.colorbar(pcm, ax=ax, label="Potência (dB)")
 
-# (c) Welch PSD (log)
-ax = axes[2]
-ax.semilogy(welch_freqs, welch_rest, label="Repouso", color="tab:blue", lw=1.5)
-ax.semilogy(welch_freqs, welch_flex, label="Contração", color="tab:red", lw=1.5)
-ax.axvspan(*EMG_BAND, color="green", alpha=0.07)
-for hz in MAINS_HARMONICS:
-    ax.axvline(hz, color="grey", ls=":", alpha=0.6)
-ax.set_xlim(0, FS / 2)
-ax.set_xlabel("Frequência (Hz)")
-ax.set_ylabel("PSD (log)")
-ax.set_title("(c) PSD (estimativa de Welch, log) — visão mais suave dos espectros")
-ax.legend(loc="upper right", fontsize=9)
-ax.grid(True, which="both", alpha=0.3)
 
-# (d) Spectrogram
-ax = axes[3]
-f_spec, t_spec, Sxx = spectrogram(sig - sig.mean(), fs=FS, nperseg=256, noverlap=128)
-pcm = ax.pcolormesh(t_spec, f_spec, 10 * np.log10(Sxx + 1e-12), shading="gouraud", cmap="viridis")
-fig.colorbar(pcm, ax=ax, label="Potência (dB)")
-for t0 in [5, 10, 15, 20, 25]:
-    ax.axvline(t0, color="white", ls="--", alpha=0.6, lw=0.8)
-ax.set_xlabel("Tempo (s)")
-ax.set_ylabel("Frequência (Hz)")
-ax.set_title("(d) Espectrograma — bandas verticais escuras = contrações")
+def draw_fft(ax):
+    ax.plot(fft_freqs, fft_rest, label="Repouso (mão aberta, parada)", color="tab:blue", lw=1.5)
+    ax.plot(fft_freqs, fft_flex, label="Contração (mão fechada)", color="tab:red", lw=1.5)
+    ax.axvspan(*EMG_BAND, color="green", alpha=0.07,
+               label=f"Banda dominante sEMG ({EMG_BAND[0]}–{EMG_BAND[1]} Hz)")
+    for hz in MAINS_HARMONICS:
+        ax.axvline(hz, color="grey", ls=":", alpha=0.6)
+        ax.text(hz, ax.get_ylim()[1] * 0.95, f" {hz} Hz",
+                color="grey", fontsize=8, va="top")
+    ax.set_xlim(0, FS / 2)
+    ax.set_xlabel("Frequência (Hz)")
+    ax.set_ylabel("Magnitude FFT (linear)")
+    ax.set_title("Espectro médio: repouso vs contração (FFT linear)")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.grid(True, alpha=0.3)
 
-plt.tight_layout()
-plt.savefig(OUT_PNG, dpi=120)
-print(f"saved {OUT_PNG}")
+
+def draw_welch_psd(ax):
+    ax.semilogy(welch_freqs, welch_rest, label="Repouso", color="tab:blue", lw=1.5)
+    ax.semilogy(welch_freqs, welch_flex, label="Contração", color="tab:red", lw=1.5)
+    ax.axvspan(*EMG_BAND, color="green", alpha=0.07)
+    for hz in MAINS_HARMONICS:
+        ax.axvline(hz, color="grey", ls=":", alpha=0.6)
+    ax.set_xlim(0, FS / 2)
+    ax.set_xlabel("Frequência (Hz)")
+    ax.set_ylabel("PSD (log)")
+    ax.set_title("PSD (Welch, log) — visão suave dos espectros")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.grid(True, which="both", alpha=0.3)
+
+
+# ---------- Combined 4-panel figure ----------
+# Layout: 4 rows × 2 columns. Column 0 hosts every plot at uniform width;
+# column 1 is a thin slot reserved for the spectrogram colorbar (empty for
+# the other rows). This keeps all four panels visually aligned by width.
+fig = plt.figure(figsize=(12, 14))
+gs = fig.add_gridspec(
+    nrows=4, ncols=2,
+    width_ratios=[1.0, 0.025],
+    hspace=0.45, wspace=0.04,
+)
+ax_time = fig.add_subplot(gs[0, 0])
+ax_spec = fig.add_subplot(gs[1, 0])
+cax_spec = fig.add_subplot(gs[1, 1])
+ax_fft = fig.add_subplot(gs[2, 0])
+ax_welch = fig.add_subplot(gs[3, 0])
+
+draw_timeseries(ax_time)
+draw_spectrogram(ax_spec, fig, cax=cax_spec)
+draw_fft(ax_fft)
+draw_welch_psd(ax_welch)
+
+for ext in ("png", "svg"):
+    out = os.path.join(SCRIPT_DIR, f"spectral_analysis.{ext}")
+    plt.savefig(out, dpi=SAVE_DPI, bbox_inches="tight")
+    print(f"saved {out}")
+plt.close(fig)
+
+
+# ---------- Individual panels (vector) ----------
+def save_individual(fname, draw_fn, needs_fig=False):
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    if needs_fig:
+        draw_fn(ax, fig)          # spectrogram gets a colorbar on its own
+    else:
+        draw_fn(ax)
+    plt.tight_layout()
+    out = os.path.join(SCRIPT_DIR, fname)
+    plt.savefig(out, dpi=SAVE_DPI, bbox_inches="tight")
+    print(f"saved {out}")
+    plt.close(fig)
+
+
+save_individual("panel_timeseries.svg",  draw_timeseries)
+save_individual("panel_spectrogram.svg", draw_spectrogram, needs_fig=True)
+save_individual("panel_fft.svg",         draw_fft)
+save_individual("panel_welch_psd.svg",   draw_welch_psd)
 
 
 # ---------- Console summary ----------
