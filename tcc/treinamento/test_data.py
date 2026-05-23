@@ -101,12 +101,16 @@ def test_make_windows_skips_transition_zones():
 def test_make_windows_excludes_margin():
     """The 250 samples around each transition should produce no windows."""
     n = FS * DURATION
-    sig = np.zeros(n)
+    sig = np.arange(n).astype(float)
     labels = np.empty(n, dtype=np.int8)
     labels[:2500] = 0
     labels[2500:] = 1
     X, y = make_windows(sig, labels)
-    # No window should start in [2500 - margin - WINDOW_SIZE + 1, 2500 + margin)
-    # since those would either straddle the transition or overlap the margin.
-    # Just confirm the transition itself never appears in a window's labels.
     assert len(X) >= 1
+    # No surviving window may straddle the transition zone [2500-250, 2500+250).
+    # Recover each window's start from the tracer signal (sig = arange).
+    for win in X:
+        start = int(win[0])
+        win_labels = labels[start:start + WINDOW_SIZE]
+        assert win_labels.min() == win_labels.max(), (
+            f"Window at start={start} has mixed labels — margin failed.")

@@ -91,4 +91,7 @@ def make_windows(signal: np.ndarray,
             continue          # mixed-label window (defensive)
         Xs.append(win)
         ys.append(int(win_labels[0]))
+    if not Xs:
+        return (np.empty((0, WINDOW_SIZE), dtype=float),
+                np.empty((0,), dtype=np.int8))
     return np.asarray(Xs), np.asarray(ys, dtype=np.int8)
