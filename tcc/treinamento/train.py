@@ -129,12 +129,21 @@ def select_winner(results: List[ConfigResult]) -> ConfigResult:
     return sorted(results, key=sort_key)[0]
 
 
+import joblib
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
+PKL_PATH = os.path.join(SCRIPT_DIR, "dt_500hz.pkl")
+
+
+def save_pkl(clf: DecisionTreeClassifier, feature_names: List[str]):
+    """Save model + feature names in a single dict via joblib."""
+    payload = {"model": clf, "features": feature_names, "fs": 500}
+    joblib.dump(payload, PKL_PATH)
+    print(f"Saved {PKL_PATH}")
 
 
 def ensure_results_dir():
@@ -275,3 +284,4 @@ if __name__ == "__main__":
     winning_features = FEATURE_SETS[winner.feature_set]
     plot_decision_tree(clf_final, winning_features)
     plot_feature_importance(clf_final, winning_features)
+    save_pkl(clf_final, winning_features)
