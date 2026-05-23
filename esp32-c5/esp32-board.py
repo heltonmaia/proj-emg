@@ -21,7 +21,7 @@ import time
 from machine import ADC, Pin
 
 # ---------- Config ----------
-SAMPLE_RATE = 1000                       # Hz
+SAMPLE_RATE = 2000                       # Hz
 ADC_PIN = 1                              # GPIO1 = ADC1_CH0 (C5 has a single ADC unit)
 PERIOD_US = 1_000_000 // SAMPLE_RATE
 

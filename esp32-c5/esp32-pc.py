@@ -24,7 +24,7 @@ import time
 
 import serial
 
-FS = 1000
+FS = 2000
 DURATION_S = 30
 TOTAL_SAMPLES = FS * DURATION_S
 
