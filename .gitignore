@@ -1,3 +1,6 @@
 CLAUDE.md
 __pycache__/
 *.pyc
+
+# ESP32-C5 validation/test recordings (only noise; not project data)
+esp32-c5/c5_test_*.csv
