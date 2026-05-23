@@ -112,12 +112,68 @@ FEATURE_FUNCS = {
 }
 
 
-def extract_features(windows: np.ndarray,
-                     feature_names: Sequence[str]) -> np.ndarray:
-    """Apply each feature function to each window. Returns (N_windows, N_features)."""
-    out = np.zeros((len(windows), len(feature_names)))
+# Vectorized variants: take (N_windows, WINDOW_SIZE) → return (N_windows,)
+# These exist to make `extract_features` fast on the sweep workload.
+
+def _rms_vec(X):
+    return np.sqrt(np.mean(X * X, axis=1))
+
+
+def _mav_vec(X):
+    return np.mean(np.abs(X), axis=1)
+
+
+def _sd_vec(X):
+    return np.std(X, axis=1, ddof=0)
+
+
+def _var_vec(X):
+    return np.var(X, axis=1, ddof=0)
+
+
+def _wl_vec(X):
+    return np.sum(np.abs(np.diff(X, axis=1)), axis=1)
+
+
+def _zc_vec(X, threshold=0.0):
+    a = X[:, :-1]
+    b = X[:, 1:]
+    return np.sum((a * b < 0) & (np.abs(b - a) > threshold), axis=1)
+
+
+def _ssc_vec(X, threshold=0.0):
+    d = np.diff(X, axis=1)
+    d1 = d[:, :-1]
+    d2 = d[:, 1:]
+    return np.sum((d1 * d2 < 0) & (np.abs(d2 - d1) > threshold), axis=1)
+
+
+VECTORIZED_FEATURE_FUNCS = {
+    "rms": _rms_vec,
+    "mav": _mav_vec,
+    "sd": _sd_vec,
+    "var": _var_vec,
+    "wl": _wl_vec,
+    "zc": _zc_vec,
+    "ssc": _ssc_vec,
+}
+
+
+def extract_features(windows, feature_names):
+    """Apply each named feature to every row of `windows` (vectorized).
+
+    Returns ``(N_windows, N_features)`` as float64.
+    """
+    unknown = [n for n in feature_names if n not in VECTORIZED_FEATURE_FUNCS]
+    if unknown:
+        raise ValueError(
+            f"Unknown feature(s) {unknown!r}. "
+            f"Available: {sorted(VECTORIZED_FEATURE_FUNCS)}"
+        )
+    X = np.asarray(windows, dtype=float)
+    if X.ndim != 2:
+        raise ValueError(f"`windows` must be 2-D (N, W); got shape {X.shape}")
+    out = np.empty((X.shape[0], len(feature_names)), dtype=np.float64)
     for j, name in enumerate(feature_names):
-        fn = FEATURE_FUNCS[name]
-        for i, w in enumerate(windows):
-            out[i, j] = fn(w)
+        out[:, j] = VECTORIZED_FEATURE_FUNCS[name](X)
     return out
