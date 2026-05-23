@@ -15,6 +15,31 @@ root `README.md`.
 > enough headroom for 2 kHz sampling + on-device IIR filtering). MicroPython
 > v1.28.0 (Apr 2026) has stable C5 support.
 
+## Hardware wiring
+
+Connect the EMG sensor breakout to the C5 dev kit as follows:
+
+| Sensor pin | C5 pin | Notes                                            |
+|-----------:|:-------|:-------------------------------------------------|
+| **SIG / OUT** | **GPIO1** | Analog output of the sensor → ADC1_CH0.       |
+| **GND**       | **GND**   | Any GND pin on the dev kit. Common ground is mandatory for single-ended ADC. |
+| **VCC**       | **3V3**   | Use the 3.3 V rail, not 5 V — the C5 ADC tops out at ~3.3 V with ATTN_11DB. |
+
+The exact silkscreen label for **GPIO1** depends on your dev kit. On the
+Espressif `ESP32-C5-DevKitC-1`, it's typically printed as `IO1` or `1` on
+the header. If the board has both `GPIO1` and `IO1` labels, they're the
+same pin.
+
+Avoid `GPIO2` and `GPIO3` for the analog input even though they are also
+on the ADC — they're **strap pins** (boot mode selection), so applying a
+sensor's static bias to them at power-on can put the chip in a wrong
+boot state. `GPIO1`, `GPIO4`, `GPIO5`, and `GPIO6` are all safe analog
+inputs.
+
+If you ever need to move the input to a different pin, change `ADC_PIN`
+in `esp32-board.py` to the new GPIO number — the MicroPython API takes
+the GPIO directly.
+
 ## The two scripts run on different machines
 
 ```
