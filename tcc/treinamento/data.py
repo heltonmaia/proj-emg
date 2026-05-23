@@ -6,7 +6,7 @@ open (20s) -> closed (25s).
 """
 
 import os
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -95,3 +95,29 @@ def make_windows(signal: np.ndarray,
         return (np.empty((0, WINDOW_SIZE), dtype=float),
                 np.empty((0,), dtype=np.int8))
     return np.asarray(Xs), np.asarray(ys, dtype=np.int8)
+
+
+import features as feat_module
+
+
+FEATURE_FUNCS = {
+    "rms": feat_module.rms,
+    "mav": feat_module.mav,
+    "sd": feat_module.sd,
+    "wl": feat_module.wl,
+    "var": feat_module.var,
+    "zc": feat_module.zc,
+    "ssc": feat_module.ssc,
+    # wamp omitted from default registry — it needs a per-call threshold
+}
+
+
+def extract_features(windows: np.ndarray,
+                     feature_names: Sequence[str]) -> np.ndarray:
+    """Apply each feature function to each window. Returns (N_windows, N_features)."""
+    out = np.zeros((len(windows), len(feature_names)))
+    for j, name in enumerate(feature_names):
+        fn = FEATURE_FUNCS[name]
+        for i, w in enumerate(windows):
+            out[i, j] = fn(w)
+    return out

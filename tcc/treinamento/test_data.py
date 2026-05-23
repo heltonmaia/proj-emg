@@ -71,6 +71,7 @@ def test_load_csv_raises_on_wrong_length():
 
 
 from data import make_windows, WINDOW_SIZE, STEP_SIZE, TRANSITION_MARGIN_SAMPLES
+from data import extract_features
 
 
 def test_make_windows_skips_transition_zones():
@@ -114,3 +115,16 @@ def test_make_windows_excludes_margin():
         win_labels = labels[start:start + WINDOW_SIZE]
         assert win_labels.min() == win_labels.max(), (
             f"Window at start={start} has mixed labels — margin failed.")
+
+
+def test_extract_features_returns_right_shape():
+    X = np.random.randn(5, 100).astype(float)
+    feature_names = ["rms", "mav", "sd", "wl"]
+    F = extract_features(X, feature_names)
+    assert F.shape == (5, 4)
+
+
+def test_extract_features_supports_zc_ssc():
+    X = np.random.randn(3, 100).astype(float)
+    F = extract_features(X, ["rms", "mav", "sd", "wl", "zc", "ssc"])
+    assert F.shape == (3, 6)
