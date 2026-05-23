@@ -22,7 +22,7 @@ from scipy.signal import butter, iirnotch, sosfiltfilt, filtfilt
 # CONFIGURAÇÕES
 # ======================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(SCRIPT_DIR, "new_emg_data8.csv")
+CSV_PATH = os.path.join(SCRIPT_DIR, "..", "rec_emg", "new_emg_data8.csv")
 
 fs = 500            # taxa de amostragem (Hz)
 lowcut = 20         # passa-faixa: corte inferior (Hz)
