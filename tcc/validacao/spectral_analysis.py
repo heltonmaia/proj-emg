@@ -10,17 +10,14 @@ Runs the same analysis on both reference recordings:
 Both recordings are assumed to follow the same 30-second prompt protocol:
   0s open/still, 5s close, 10s open, 15s close, 20s open, 25s close.
 
-For each recording the script produces:
+For each recording the script writes outputs into a subfolder named
+after the sample rate (e.g. ``500hz/``, ``1000hz/``):
 
-  Combined 4-panel figure (time → spectrogram → FFT → Welch PSD):
-    spectral_analysis_<fs>hz.png
-    spectral_analysis_<fs>hz.svg
-
-  Individual panels (vector):
-    panel_timeseries_<fs>hz.svg
-    panel_spectrogram_<fs>hz.svg
-    panel_fft_<fs>hz.svg
-    panel_welch_psd_<fs>hz.svg
+  <fs>hz/spectral_analysis.{png,svg}    Combined 4-panel figure
+  <fs>hz/panel_timeseries.svg           Individual panels (vector)
+  <fs>hz/panel_spectrogram.svg
+  <fs>hz/panel_fft.svg
+  <fs>hz/panel_welch_psd.svg
 
   A console summary of contraction/rest energy ratios per band.
 
@@ -194,6 +191,9 @@ def analyze(ds: Dataset):
         welch_freqs, welch_rest, welch_flex, spec_f, spec_t, Sxx,
     )
 
+    out_dir = os.path.join(SCRIPT_DIR, ds.label)
+    os.makedirs(out_dir, exist_ok=True)
+
     # Combined 4-panel
     fig = plt.figure(figsize=(12, 14))
     gs = fig.add_gridspec(nrows=4, ncols=2, width_ratios=[1.0, 0.025],
@@ -208,17 +208,17 @@ def analyze(ds: Dataset):
     draw_fft(ax_fft)
     draw_wp(ax_welch)
     for ext in ("png", "svg"):
-        out = os.path.join(SCRIPT_DIR, f"spectral_analysis_{ds.label}.{ext}")
+        out = os.path.join(out_dir, f"spectral_analysis.{ext}")
         plt.savefig(out, dpi=SAVE_DPI, bbox_inches="tight")
         print(f"saved {out}")
     plt.close(fig)
 
     # Individual panels
     individuals = [
-        (f"panel_timeseries_{ds.label}.svg",  draw_ts,  False),
-        (f"panel_spectrogram_{ds.label}.svg", draw_sp, True),
-        (f"panel_fft_{ds.label}.svg",         draw_fft, False),
-        (f"panel_welch_psd_{ds.label}.svg",   draw_wp,  False),
+        ("panel_timeseries.svg",  draw_ts,  False),
+        ("panel_spectrogram.svg", draw_sp, True),
+        ("panel_fft.svg",         draw_fft, False),
+        ("panel_welch_psd.svg",   draw_wp,  False),
     ]
     for fname, fn, needs_fig in individuals:
         fig, ax = plt.subplots(figsize=(10, 4.5))
@@ -227,10 +227,10 @@ def analyze(ds: Dataset):
         else:
             fn(ax)
         plt.tight_layout()
-        out = os.path.join(SCRIPT_DIR, fname)
+        out = os.path.join(out_dir, fname)
         plt.savefig(out, dpi=SAVE_DPI, bbox_inches="tight")
         plt.close(fig)
-    print(f"saved 4 individual SVG panels for {ds.label}")
+    print(f"saved 4 individual SVG panels in {out_dir}")
 
     # Per-dataset band ratios (returned for the final comparison table)
     ratios = {}

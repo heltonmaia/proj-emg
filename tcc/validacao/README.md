@@ -18,17 +18,25 @@ prompts assumida: 0s aberta parada → 5s fecha → 10s abre → 15s fecha →
 
 ## Conteúdo
 
-| Arquivo | O que é |
-|---|---|
-| `spectral_analysis.py` | Script que processa as duas gravações e gera figuras + tabela comparativa. |
-| `reference_signal_500hz.csv` | Gravação a 500 Hz. |
-| `reference_signal_1000hz.csv` | Gravação a 1000 Hz. |
-| `spectral_analysis_500hz.{png,svg}` | Figura combinada 4-painel da gravação de 500 Hz. |
-| `spectral_analysis_1000hz.{png,svg}` | Figura combinada 4-painel da gravação de 1000 Hz. |
-| `panel_timeseries_<fs>hz.svg` | Painel individual: sinal no tempo. |
-| `panel_spectrogram_<fs>hz.svg` | Painel individual: espectrograma. |
-| `panel_fft_<fs>hz.svg` | Painel individual: FFT linear médio repouso vs contração. |
-| `panel_welch_psd_<fs>hz.svg` | Painel individual: PSD (Welch, escala log). |
+```
+tcc/validacao/
+├── README.md
+├── spectral_analysis.py            # script que processa as duas gravações
+├── reference_signal_500hz.csv      # gravação Pico, 500 Hz
+├── reference_signal_1000hz.csv     # gravação Pico, 1000 Hz
+├── 500hz/                          # resultados da gravação de 500 Hz
+│   ├── spectral_analysis.{png,svg} # figura combinada 4 painéis
+│   ├── panel_timeseries.svg        # painel individual: sinal no tempo
+│   ├── panel_spectrogram.svg       # painel individual: espectrograma
+│   ├── panel_fft.svg               # painel individual: FFT linear
+│   └── panel_welch_psd.svg         # painel individual: PSD Welch (log)
+└── 1000hz/                         # idem, resultados da gravação de 1000 Hz
+    ├── spectral_analysis.{png,svg}
+    ├── panel_timeseries.svg
+    ├── panel_spectrogram.svg
+    ├── panel_fft.svg
+    └── panel_welch_psd.svg
+```
 
 PNG é só pra preview rápido; SVG é o formato de trabalho (vetorial,
 editável). O espectrograma usa `rasterized=True` no `pcolormesh` —
