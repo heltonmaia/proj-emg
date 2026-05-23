@@ -129,11 +129,48 @@ def select_winner(results: List[ConfigResult]) -> ConfigResult:
     return sorted(results, key=sort_key)[0]
 
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
 
 
 def ensure_results_dir():
     os.makedirs(RESULTS_DIR, exist_ok=True)
+
+
+def plot_confusion_matrix(y_true, y_pred):
+    """Save absolute + normalized confusion matrix side by side."""
+    ensure_results_dir()
+    cm_abs = confusion_matrix(y_true, y_pred)
+    cm_norm = cm_abs.astype(float) / cm_abs.sum(axis=1, keepdims=True)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    for ax, mat, title, fmt in [
+        (axes[0], cm_abs, "Absolute counts", "d"),
+        (axes[1], cm_norm, "Normalized per true class", ".2f"),
+    ]:
+        im = ax.imshow(mat, cmap="Blues", aspect="equal")
+        ax.set_title(title)
+        ax.set_xlabel("Predito")
+        ax.set_ylabel("Real")
+        ax.set_xticks([0, 1]); ax.set_xticklabels(["aberta", "fechada"])
+        ax.set_yticks([0, 1]); ax.set_yticklabels(["aberta", "fechada"])
+        for i in range(2):
+            for j in range(2):
+                val = mat[i, j]
+                txt = format(val, fmt)
+                color = "white" if val > mat.max() * 0.6 else "black"
+                ax.text(j, i, txt, ha="center", va="center", color=color)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    plt.tight_layout()
+    for ext in ("png", "svg"):
+        out = os.path.join(RESULTS_DIR, f"confusion_matrix.{ext}")
+        plt.savefig(out, dpi=150, bbox_inches="tight")
+        print(f"Saved {out}")
+    plt.close(fig)
 
 
 def write_metrics(results: List[ConfigResult], winner: ConfigResult,
@@ -192,3 +229,4 @@ if __name__ == "__main__":
     ds_winner = build_dataset(csvs, FEATURE_SETS[winner.feature_set])
     _, _, y_true, y_pred = logo_accuracy(ds_winner, max_depth=winner.max_depth)
     write_metrics(results, winner, ds_winner, y_true, y_pred)
+    plot_confusion_matrix(y_true, y_pred)
