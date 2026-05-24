@@ -266,8 +266,8 @@ def plot_confusion_matrix(y_true, y_pred):
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     for ax, mat, title, fmt in [
-        (axes[0], cm_abs, "Absolute counts", "d"),
-        (axes[1], cm_norm, "Normalized per true class", ".2f"),
+        (axes[0], cm_abs, "Contagens absolutas", "d"),
+        (axes[1], cm_norm, "Normalizada por classe real", ".2f"),
     ]:
         im = ax.imshow(mat, cmap="Blues", aspect="equal")
         ax.set_title(title)
@@ -345,7 +345,14 @@ def plot_decision_tree(clf: DecisionTreeClassifier, feature_names: List[str]):
     fig, ax = plt.subplots(figsize=(16, 8))
     plot_tree(clf, ax=ax, feature_names=feature_names,
               class_names=["aberta", "fechada"], filled=True, rounded=True,
-              fontsize=9)
+              impurity=False, fontsize=9)
+    # sklearn renders node text in English; rewrite in place to PT
+    for text in ax.texts:
+        s = text.get_text()
+        s = s.replace("samples = ", "amostras = ")
+        s = s.replace("value = ", "valor = ")
+        s = s.replace("class = ", "classe = ")
+        text.set_text(s)
     plt.tight_layout()
     for ext in ("png", "svg"):
         out = os.path.join(RESULTS_DIR, f"decision_tree.{ext}")
@@ -362,8 +369,8 @@ def plot_feature_importance(clf: DecisionTreeClassifier, feature_names: List[str
     ax.bar(range(len(imp)), imp[order], color="tab:blue")
     ax.set_xticks(range(len(imp)))
     ax.set_xticklabels([feature_names[i] for i in order], rotation=0)
-    ax.set_ylabel("Importance")
-    ax.set_title("Decision Tree — feature importance")
+    ax.set_ylabel("Importância")
+    ax.set_title("Árvore de decisão — importância das features")
     ax.grid(True, axis="y", alpha=0.3)
     plt.tight_layout()
     for ext in ("png", "svg"):

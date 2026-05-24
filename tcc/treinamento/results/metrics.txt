@@ -1,5 +1,5 @@
 # Sweep results — Classificador EMG 500 Hz
-# Generated: 2026-05-23 21:02:38
+# Generated: 2026-05-23 21:59:46
 # Total configs tested: 30
 # Dataset: 2440 windows × 4 features
 
